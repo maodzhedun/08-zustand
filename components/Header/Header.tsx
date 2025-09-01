@@ -16,6 +16,9 @@ async function Header() {
             <Link href="/">Home</Link>
           </li>
           <li>
+            <Link href="/notes/action/create">Create Note</Link>
+          </li>
+          <li>
             <TagsMenu />
           </li>
         </ul>

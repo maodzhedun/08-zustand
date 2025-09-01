@@ -1,27 +1,17 @@
-import { Formik, Form, Field, ErrorMessage } from 'formik';
-import type { FormikHelpers } from 'formik';
-import { useId } from 'react';
+'use client';
+
+import { useRouter } from 'next/navigation';
 import * as Yup from 'yup';
 import { createNote } from '@/lib/api';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 
 import css from './NoteForm.module.css';
 
-interface NoteFormProps {
-  onClose: () => void;
-}
-
 interface NoteFormValues {
   title: string;
   content: string;
   tag: string;
 }
-
-const initialValues: NoteFormValues = {
-  title: '',
-  content: '',
-  tag: '',
-};
 
 const NoteFormSchema = Yup.object().shape({
   title: Yup.string()
@@ -34,104 +24,107 @@ const NoteFormSchema = Yup.object().shape({
     .required('Tag is required'),
 });
 
-export default function NoteForm({ onClose }: NoteFormProps) {
+export default function NoteForm() {
+  const router = useRouter();
   const queryClient = useQueryClient();
+
   const createNoteMutation = useMutation({
     mutationFn: createNote,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['notes'] });
-      onClose();
+      router.back();
     },
   });
 
-  const fieldId = useId();
+  const handleCreateNote = async (formData: FormData) => {
+    const noteData: NoteFormValues = {
+      title: formData.get('title') as string,
+      content: formData.get('content') as string,
+      tag: formData.get('tag') as string,
+    };
 
-  const handleSubmit = (
-    values: NoteFormValues,
-    actions: FormikHelpers<NoteFormValues>
-  ) => {
-    createNoteMutation.mutate(values, {
-      onSuccess: () => {
-        console.log('Form submitted with values:', values);
-        actions.resetForm();
-      },
-      onError: error => {
-        console.error('Failed to create note:', error);
-      },
-    });
+    try {
+      await NoteFormSchema.validate(noteData, { abortEarly: false });
+      await createNoteMutation.mutateAsync(noteData);
+    } catch (validationError) {
+      if (validationError instanceof Yup.ValidationError) {
+        const errorMessages = validationError.inner.map(error => error.message);
+        alert(
+          `Please fix the following errors:\n\n${errorMessages.join('\n')}`
+        );
+      } else {
+        alert('Failed to create note. Please try again.');
+      }
+      throw validationError;
+    }
+  };
+
+  const handleCancel = () => {
+    router.back();
   };
 
   return (
-    <Formik
-      initialValues={initialValues}
-      onSubmit={handleSubmit}
-      validationSchema={NoteFormSchema}
-    >
-      {({ isSubmitting }) => (
-        <Form className={css.form}>
-          <fieldset className={css.formGroup}>
-            <label htmlFor={`${fieldId}-title`}>Title</label>
-            <Field
-              id={`${fieldId}-title`}
-              type="text"
-              name="title"
-              className={css.input}
-            />
-            <ErrorMessage name="title" component="span" className={css.error} />
-          </fieldset>
+    <form action={handleCreateNote} className={css.form}>
+      <fieldset className={css.formGroup}>
+        <label htmlFor="title" className={css.label}>
+          Title *
+        </label>
+        <input
+          type="text"
+          name="title"
+          id="title"
+          className={css.input}
+          placeholder="Enter a descriptive title (3-50 characters)"
+          required
+        />
+      </fieldset>
 
-          <fieldset className={css.formGroup}>
-            <label htmlFor={`${fieldId}-content`}>Content</label>
-            <Field
-              as="textarea"
-              id={`${fieldId}-content`}
-              name="content"
-              rows={8}
-              className={css.textarea}
-            />
-            <ErrorMessage
-              name="content"
-              component="span"
-              className={css.error}
-            />
-          </fieldset>
+      <fieldset className={css.formGroup}>
+        <label htmlFor="content" className={css.label}>
+          Content
+        </label>
+        <textarea
+          name="content"
+          id="content"
+          rows={8}
+          className={css.textarea}
+          placeholder="Write your note content here (max 500 characters)"
+        />
+      </fieldset>
 
-          <fieldset className={css.formGroup}>
-            <label htmlFor={`${fieldId}-tag`}>Tag</label>
-            <Field
-              as="select"
-              id={`${fieldId}-tag`}
-              name="tag"
-              className={css.select}
-            >
-              <option value="">-- Choose type note</option>
-              <option value="Todo">Todo</option>
-              <option value="Work">Work</option>
-              <option value="Personal">Personal</option>
-              <option value="Meeting">Meeting</option>
-              <option value="Shopping">Shopping</option>
-            </Field>
-            <ErrorMessage name="tag" component="span" className={css.error} />
-          </fieldset>
+      <fieldset className={css.formGroup}>
+        <label htmlFor="tag" className={css.label}>
+          Tag *
+        </label>
+        <select name="tag" id="tag" className={css.select} required>
+          <option value="">-- Choose a category --</option>
+          <option value="Todo">📝 Todo</option>
+          <option value="Work">💼 Work</option>
+          <option value="Personal">🏠 Personal</option>
+          <option value="Meeting">👥 Meeting</option>
+          <option value="Shopping">🛒 Shopping</option>
+        </select>
+      </fieldset>
 
-          <div className={css.actions}>
-            <button
-              type="button"
-              className={css.cancelButton}
-              onClick={onClose}
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              className={css.submitButton}
-              disabled={isSubmitting || createNoteMutation.isPending}
-            >
-              {createNoteMutation.isPending ? 'Creating...' : 'Create note'}
-            </button>
-          </div>
-        </Form>
-      )}
-    </Formik>
+      <div className={css.requiredHint}>* Required fields</div>
+
+      <div className={css.actions}>
+        <button
+          type="button"
+          className={css.cancelButton}
+          onClick={handleCancel}
+          disabled={createNoteMutation.isPending}
+        >
+          Cancel
+        </button>
+        <button
+          type="submit"
+          className={css.submitButton}
+          disabled={createNoteMutation.isPending}
+        >
+          {createNoteMutation.isPending ? 'Creating...' : 'Create Note'}
+        </button>
+      </div>
+    </form>
   );
 }
