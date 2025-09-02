@@ -13,9 +13,7 @@ type Props = {
   params: Promise<{ id: string }>;
 };
 
-export async function generateMetadata({
-  params,
-}: Props): Promise<Metadata> {
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { id } = await params;
   const note = await fetchNoteById(id);
 
@@ -25,7 +23,7 @@ export async function generateMetadata({
     openGraph: {
       title: `NoteHub - ${note.title}`,
       description: note.content.slice(0, 160),
-      url: 'https://notehub-public.goit.study/api/notes',
+      url: 'https://08-zustand-lemon-eta.vercel.app/notes/${id}',
       siteName: 'NoteHub',
       locale: 'en_US',
       type: 'website',
